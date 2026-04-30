@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 
 BASE_URL = 'https://api.worldbank.org/v2'
-INDICATOR_CODE = 'FR.INR.LEND'
+INDICATOR_CODES = ['FR.INR.LEND', 'FR.INR.RINR']
 COUNTRY_CODE = 'AU'
 
 def extract_from_api(indicator, country):
@@ -41,16 +41,13 @@ def main():
     load_dotenv(dotenv_path)
     bucket_name = os.getenv('GCS_BRONZE_BUCKET')
 
-    indicator = INDICATOR_CODE
     country = COUNTRY_CODE
 
-    metadata, records = extract_from_api(indicator, country)
-
-    payload = package_data(records, indicator)
-
-    blob_path = f"interest_rates/{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
-
-    upload_to_gcs(bucket_name, blob_path, payload)
+    for indicator in INDICATOR_CODES:
+        _, records = extract_from_api(indicator, country)
+        payload = package_data(records, indicator)
+        blob_path = f"interest_rates/{datetime.now(timezone.utc).strftime('%Y-%m-%d')}_{indicator}.json"
+        upload_to_gcs(bucket_name, blob_path, payload)
 
 if __name__ == '__main__':
     main()

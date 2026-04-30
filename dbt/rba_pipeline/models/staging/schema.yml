@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: gold
+    database: rba-pipeline-494410
+    schema: gold
+    tables:
+      - name: stg_interest_rates_raw
+        columns:
+          - name: date
+            tests: 
+              - not_null
+          - name: indicator_id
+            tests: 
+              - not_null
+          - name: countryiso3code
+            tests:
+              - not_null
