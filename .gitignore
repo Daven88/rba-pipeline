@@ -1,2 +1,5 @@
 config/.env
 airflow/logs/
+__pycache__/
+*.pyc
+*.pyo
