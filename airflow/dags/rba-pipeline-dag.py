@@ -4,6 +4,7 @@ from airflow.operators.bash import BashOperator
 from datetime import datetime
 from src.extract.extract_from_api import main as extract_main
 from src.transform.transform import main as load_transform_main
+from src.ml.train import main as ml_train_main
 
 
 with DAG(
@@ -25,7 +26,12 @@ with DAG(
 
     dbt_task = BashOperator(
         task_id='dbt_run',
-        bash_command='cd /opt/airflow/dbt/rba_pipeline && dbt run'
+        bash_command='cd /opt/airflow/dbt/rba_pipeline && dbt clean && dbt run'
     )
 
-    extract_task >> transform_task >> dbt_task
+    ml_train = PythonOperator(
+        task_id='ml_train',
+        python_callable=ml_train_main
+    )
+
+    extract_task >> transform_task >> dbt_task >> ml_train

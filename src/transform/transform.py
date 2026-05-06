@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime, timezone, date
 
-INDICATOR_CODES = ['FR.INR.LEND', 'FR.INR.RINR']
+INDICATOR_CODES = ['FR.INR.LEND', 'FR.INR.RINR', 'FP.CPI.TOTL.ZG', 'NY.GDP.MKTP.KD.ZG', 'SP.POP.GROW', 'SL.UEM.TOTL.ZS']
 
 def read_from_bronze(bucket_name, blob):
     client = storage.Client()

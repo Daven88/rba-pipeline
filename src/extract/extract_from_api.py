@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 
 BASE_URL = 'https://api.worldbank.org/v2'
-INDICATOR_CODES = ['FR.INR.LEND', 'FR.INR.RINR']
+INDICATOR_CODES = ['FR.INR.LEND', 'FR.INR.RINR', 'FP.CPI.TOTL.ZG', 'NY.GDP.MKTP.KD.ZG', 'SP.POP.GROW', 'SL.UEM.TOTL.ZS']
 COUNTRY_CODE = 'AU'
 
 def extract_from_api(indicator, country):
