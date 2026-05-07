@@ -1,6 +1,6 @@
 # RBA Interest Rate Pipeline
 
-An end-to-end batch data pipeline for Australian interest rate data, built on GCP.
+With inflation surging and petrol prices at record highs, many Australians are asking: will interest rates go up or down? For property investors, this question is critical — higher rates directly reduce borrowing capacity, limiting what you can afford to buy. This pipeline extracts macro-economic indicators from the World Bank API, transforms and models them across a Bronze→Silver→Gold architecture on GCP, and applies machine learning to predict the direction of Australia's interest rates ahead of RBA meetings — helping answer the question: is now a good time to borrow?
 
 ## Architecture
 
@@ -84,16 +84,24 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 python src/extract/rba_extract.py
 ```
 
+## Dashboard
+
+![ML Analysis Dashboard](docs/dashboard.png)
+
+[View live dashboard](https://datastudio.google.com/reporting/96bc22f1-2266-41d8-a4d5-4362da1fc059)
+
+![Airflow DAG](docs/airflow.png)
+
 ## Modules
 
 | Module | Description                        | Status      |
 |--------|------------------------------------|-------------|
-| 1      | Project setup & GCP config         | In progress |
-| 2      | API extraction → Bronze layer      | In progress |
-| 3      | Python transforms → Silver layer   | Pending     |
-| 4      | dbt + BigQuery → Gold layer        | Pending     |
-| 5      | ML layer (rate direction model)    | Pending     |
-| 6      | Airflow DAG orchestration          | Pending     |
+| 1      | Project setup & GCP config         | Complete    |
+| 2      | API extraction → Bronze layer      | Complete    |
+| 3      | Python transforms → Silver layer   | Complete    |
+| 4      | dbt + BigQuery → Gold layer        | Complete    |
+| 5      | ML layer (rate direction model)    | Complete    |
+| 6      | Airflow DAG orchestration          | Complete    |
 | 7      | PySpark module (separate dataset)  | Pending     |
 
 ## Data Source
