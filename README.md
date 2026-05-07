@@ -92,6 +92,38 @@ python src/extract/rba_extract.py
 
 ![Airflow DAG](docs/airflow.png)
 
+## ML Results & Limitations
+
+Three classification models were trained to predict the direction of Australia's lending rate (up/down): Logistic Regression, Random Forest, and XGBoost.
+
+**Model performance (50/50 train/test split):**
+
+| Model | Accuracy | Notes |
+|---|---|---|
+| LogisticRegression | 0.57 | Best performer — simpler model generalises better on small data |
+| RandomForestClassifier | 0.50 | Overfits to majority class ("down"), rarely predicts "up" |
+| XGBClassifier | 0.43 | Same overfitting behaviour as Random Forest |
+
+**Random Forest feature importance:**
+
+| Feature | Importance | Economic interpretation |
+|---|---|---|
+| Population growth | 0.39 | New residents drive demand for goods/housing, feeding inflation |
+| Unemployment | 0.29 | Low unemployment enables wage growth and higher consumer spending |
+| CPI inflation | 0.21 | Lower than expected — annual data may capture the RBA's response rather than the signal |
+| GDP growth | 0.18 | Broader economic context for rate decisions |
+
+**Known limitations:**
+
+- **Small dataset** — annual World Bank data yields ~50 usable rows after feature engineering, which is insufficient for complex models like Random Forest and XGBoost to generalise reliably
+- **Lag distance** — 1-year lags are too coarse for RBA decision-making; the RBA responds to monthly/quarterly signals (CPI, unemployment) not annual averages
+- **Logistic Regression outperforming complex models** is expected behaviour on small datasets — simpler models generalise better when training data is limited
+
+**Future improvements:**
+
+- Integrate ABS (Australian Bureau of Statistics) monthly data for tighter lags and a larger dataset
+- Use RBA cash rate decisions directly rather than World Bank lending rate as the target variable
+
 ## Modules
 
 | Module | Description                        | Status      |
