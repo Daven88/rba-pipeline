@@ -23,6 +23,8 @@ World Bank API (JSON)
   Orchestration (Airflow)     ← scheduled every ~6 weeks (RBA meeting cadence)
 ```
 
+![Architecture Diagram](docs/Model_diagram2.drawio.png)
+
 ## Tech Stack
 
 | Layer          | Tool                    |
