@@ -126,6 +126,22 @@ Three classification models were trained to predict the direction of Australia's
 - Integrate ABS (Australian Bureau of Statistics) monthly data for tighter lags and a larger dataset
 - Use RBA cash rate decisions directly rather than World Bank lending rate as the target variable
 
+## Updates
+
+### Pub/Sub Extension
+The initial pipeline (Modules 1–6) was completed with World Bank annual data as the primary data source. However, as noted in the ML limitations, annual data yields only ~50 usable rows and the   lag is too coarse for RBA decision-making — the RBA responds to monthly signals, not yearly averages.
+
+To address this, the pipeline has been extended with a Google Cloud Pub/Sub streaming module. This lays the groundwork for integrating monthly ABS (Australian Bureau of Statistics) data scraped   directly from the ABS website, which will provide tighter lags and a significantly larger dataset for the ML model.
+
+**What was added:**
+- Publisher script: scrapes RBA cash rate decisions, batch loads historical data on first run, then streams new decisions via Pub/Sub as they are published
+- Subscriber script: receives messages and inserts rows into BigQuery using the streaming insert API
+
+**Why this matters:**
+- Replaces the coarse annual World Bank data with higher-frequency monthly ABS data
+- Improves the ML model's ability to detect the signals the RBA actually responds to (monthly CPI, unemployment)
+- Demonstrates a production-ready streaming pattern — batch for historical load, streaming for ongoing updates
+
 ## Modules
 
 | Module | Description                        | Status      |

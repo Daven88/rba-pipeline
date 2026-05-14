@@ -1,13 +1,13 @@
 from google.cloud import pubsub_v1, bigquery
 import json
-import pandas as pd
 from dotenv import load_dotenv
 import os
+import threading
 
 load_dotenv('../../config/.env')
 PROJECT_ID = os.getenv('GCP_PROJECT_ID')
-
 TABLE_NAME = 'gold.rba_decisions'
+lock = threading.Lock()
 
 def read_decisions():
     client = pubsub_v1.SubscriberClient()
@@ -18,26 +18,17 @@ def read_decisions():
 def callback(message):
     data = message.data.decode('utf-8')
     data = json.loads(data)
-    push_to_bq(data, TABLE_NAME)
+    with lock:
+        push_to_bq(data, TABLE_NAME)
     message.ack()
 
 def push_to_bq(data, table_name):
     client = bigquery.Client(project=PROJECT_ID)
     table_id = f'{PROJECT_ID}.{table_name}'
-    job_config = bigquery.LoadJobConfig(write_disposition='WRITE_APPEND')
-    df = pd.DataFrame([data])
-    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
-    job.result()
-
-def create_table():
-    client = bigquery.Client()
-    schema = [
-        bigquery.SchemaField('date', 'STRING'),
-        bigquery.SchemaField('change', 'STRING'),
-        bigquery.SchemaField('cash_rate', 'STRING')
-    ]
-    table = bigquery.Table(f'{PROJECT_ID}.{TABLE_NAME}', schema=schema)
-    client.create_table(table, exists_ok=True)
+    errors = client.insert_rows_json(table_id, [data])
+    if errors:
+        print(f"BQ insert error: {errors}")
 
 if __name__ == '__main__':
     read_decisions()
+
