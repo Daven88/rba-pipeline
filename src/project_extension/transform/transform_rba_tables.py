@@ -1,6 +1,10 @@
 import io
 import pandas as pd
 from google.cloud import storage
+from dotenv import load_dotenv
+from datetime import datetime
+import os
+from google.api_core import exceptions
 
 
 def read_from_bronze(bucket_name, blob):
@@ -63,7 +67,27 @@ def load_to_silver(data, silver_bucket, blob):
     buffer.seek(0)
     client = storage.Client()
     bucket_obj = client.bucket(silver_bucket)
-    blob_name = f'interest_rates/{date.today()}_{table}.parquet' 
-    blob_loc = bucket_obj.blob(blob_name) 
+    blob_loc = bucket_obj.blob(blob) 
     blob_loc.upload_from_string(buffer.getvalue(),content_type='application/octet-stream')
+
+def main():
+    dotenv_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', '.env')
+    load_dotenv(dotenv_path)
+    bronze_bucket = os.getenv('GCS_BRONZE_BUCKET')
+    silver_bucket = os.getenv('GCS_SILVER_BUCKET')
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    for table, config in config_dict.items():
+        try:
+            bronze_blob = f'rba_tables/{table}/{today}.csv'
+            csv_data = read_from_bronze(bronze_bucket, bronze_blob)
+            df = clean(csv_data, config)
+            silver_blob = f'rba_tables/{table}/{today}.parquet'
+            load_to_silver(df, silver_bucket, silver_blob)
+        except exceptions.NotFound:
+            print(f'{table} not found, does the extract script need to be run today?')
+    
+if __name__ == '__main__':
+    main() 
+   
 
