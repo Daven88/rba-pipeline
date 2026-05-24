@@ -16,3 +16,78 @@ sources:
           - name: countryiso3code
             tests:
               - not_null
+      - name: ext_cpi
+        columns:
+          - name: date
+            tests:
+            - not_null
+          - name: trimmed_mean_yoy
+            tests:
+            - not_null
+          - name: trimmed_mean_quarterly
+            tests:
+            - not_null
+      - name: ext_labour_force
+        columns:
+          - name: date
+            tests: 
+            - not_null
+          - name: unemployed_%
+            tests: 
+            - not_null
+          - name: unemployed_trend
+            tests: 
+            - not_null
+      - name: ext_commodity_prices
+        columns:
+          - name: date
+            tests: 
+            - not_null
+          - name: overall_AU$
+            tests: 
+            - not_null
+          - name: bulk_AU$
+            tests: 
+            - not_null
+      - name: ext_government_expenditure
+        columns:
+          - name: date
+            tests: 
+            - not_null
+          - name: household_consump
+            tests: 
+            - not_null
+          - name: government_spending
+            tests: 
+            - not_null
+      - name: ext_gdp
+        columns:
+          - name: date
+            tests: 
+            - not_null
+          - name: GDP_%
+            tests: 
+            - not_null
+          - name: ratio_exp_to_imp
+            tests: 
+            - not_null
+      - name: ext_productivity
+        columns:
+          - name: date
+            tests: 
+            - not_null
+          - name: year_ended_wage_growth
+            tests: 
+            - not_null
+          - name: year_ended_productivity_growth
+            tests: 
+            - not_null
+      - name: rba_decisions
+        columns:
+          - name: date
+            tests:
+            - not_null
+          - name: cash_rate
+            tests:
+            - not_null
+
