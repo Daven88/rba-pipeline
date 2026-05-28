@@ -5,6 +5,8 @@ from datetime import datetime
 from src.extract.extract_from_api import main as extract_main
 from src.transform.transform import main as load_transform_main
 from src.ml.train import main as ml_train_main
+from src.project_extension.extract.extract_rba_tables import main as extract_rba_main
+from src.project_extension.transform.transform_rba_tables import main as transform_rba_main
 
 
 with DAG(
@@ -34,4 +36,16 @@ with DAG(
         python_callable=ml_train_main
     )
 
-    extract_task >> transform_task >> dbt_task >> ml_train
+    extract_rba_task = PythonOperator(
+        task_id='extract_rba_csv',
+        python_callable=extract_rba_main
+    )
+
+    transform_rba_task = PythonOperator(
+        task_id='transform_rba',
+        python_callable=transform_rba_main
+    )
+
+    extract_task >> transform_task 
+    extract_rba_task >> transform_rba_task
+    [transform_task, transform_rba_task] >> dbt_task >> ml_train
