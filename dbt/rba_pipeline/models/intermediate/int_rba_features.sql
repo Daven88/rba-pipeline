@@ -5,7 +5,7 @@ WITH cpi_match_cte AS (
         ROW_NUMBER() OVER (PARTITION BY rba.date ORDER BY cpi.date DESC) AS rn
     FROM {{ ref ('stg_rba_decisions') }} AS rba
     JOIN {{ ref ('stg_cpi') }} AS cpi
-    ON CAST(SAFE.TIMESTAMP_MICROS(cpi.date) AS DATE) <= rba.date
+    ON CAST(SAFE.TIMESTAMP_MICROS(CAST(cpi.date / 1000 AS INT64)) AS DATE) <= rba.date
 ), 
 
 lf_match_cte AS (
@@ -15,7 +15,7 @@ lf_match_cte AS (
         ROW_NUMBER() OVER (PARTITION BY rba.date ORDER BY lf.date DESC) AS rn
     FROM {{ ref ('stg_rba_decisions') }} AS rba
     JOIN {{ ref ('stg_labour_force') }} AS lf
-    ON CAST(SAFE.TIMESTAMP_MICROS(lf.date) AS DATE) <= rba.date
+    ON CAST(SAFE.TIMESTAMP_MICROS(CAST(lf.date / 1000 AS INT64)) AS DATE) <= rba.date
 ), 
 
 cp_match_cte AS (
@@ -25,7 +25,7 @@ cp_match_cte AS (
         ROW_NUMBER() OVER (PARTITION BY rba.date ORDER BY cp.date DESC) AS rn
     FROM {{ ref ('stg_rba_decisions') }} AS rba
     JOIN {{ ref ('stg_commodity_prices') }} AS cp
-    ON CAST(SAFE.TIMESTAMP_MICROS(cp.date) AS DATE) <= rba.date
+    ON CAST(SAFE.TIMESTAMP_MICROS(CAST(cp.date / 1000 AS INT64)) AS DATE) <= rba.date
 ), 
 
 gdp_match_cte AS (
@@ -35,7 +35,7 @@ gdp_match_cte AS (
         ROW_NUMBER() OVER (PARTITION BY rba.date ORDER BY gdp.date DESC) AS rn
     FROM {{ ref ('stg_rba_decisions') }} AS rba
     JOIN {{ ref ('stg_gdp') }} as gdp
-    ON CAST(SAFE.TIMESTAMP_MICROS(gdp.date) AS DATE) <= rba.date
+    ON CAST(SAFE.TIMESTAMP_MICROS(CAST(gdp.date / 1000 AS INT64)) AS DATE) <= rba.date
 ), 
 
 ge_match_cte AS (
@@ -45,7 +45,7 @@ ge_match_cte AS (
         ROW_NUMBER() OVER (PARTITION BY rba.date ORDER BY ge.date DESC) AS rn
     FROM {{ ref ('stg_rba_decisions') }} AS rba
     JOIN {{ ref ('stg_government_expenditure') }} as ge
-    ON CAST(SAFE.TIMESTAMP_MICROS(ge.date) AS DATE) <= rba.date
+    ON CAST(SAFE.TIMESTAMP_MICROS(CAST(ge.date / 1000 AS INT64)) AS DATE) <= rba.date
 ),
 
 prd_match_cte AS (
@@ -55,7 +55,7 @@ prd_match_cte AS (
         ROW_NUMBER() OVER (PARTITION BY rba.date ORDER BY prd.date DESC) AS rn
     FROM {{ ref ('stg_rba_decisions') }} AS rba
     JOIN {{ ref ('stg_productivity') }} AS prd
-    ON CAST(SAFE.TIMESTAMP_MICROS(prd.date) AS DATE) <= rba.date
+    ON CAST(SAFE.TIMESTAMP_MICROS(CAST(prd.date / 1000 AS INT64)) AS DATE) <= rba.date
 )
 
 SELECT
