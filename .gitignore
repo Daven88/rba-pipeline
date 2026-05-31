@@ -5,3 +5,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.bkp
+logs/dbt.log
+src/project_extension/rba_tables/.ipynb_checkpoints/
+src/project_extension/rba_tables/rba_merged.parquet
+.claude/settings.local.json
