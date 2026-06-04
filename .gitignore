@@ -9,3 +9,6 @@ logs/dbt.log
 src/project_extension/rba_tables/.ipynb_checkpoints/
 src/project_extension/rba_tables/rba_merged.parquet
 .claude/settings.local.json
+src/project_extension/ml/models/
+config/*.json
+.streamlit/secrets.toml

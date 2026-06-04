@@ -2,19 +2,27 @@ from google.cloud import bigquery
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from google.oauth2 import service_account
 
 PROJECT_ID = 'rba-pipeline-494410'
 
 BQ_TABLES = ['ml_future_prediction', 'ml_model_scores', 'ml_feature_importance', 'mart_rba_decisions']
 
 def load_data(table):
-    client = bigquery.Client(project=PROJECT_ID)
+    credentials = service_account.Credentials.from_service_account_info(st.secrets['gcp_service_account'])
+    client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
     if table == 'mart_rba_decisions':
         query = f'SELECT * FROM `{PROJECT_ID}.gold.{table}` ORDER BY date'
     else:
         query = f'SELECT * FROM `{PROJECT_ID}.gold.{table}`'
     df = client.query(query).to_dataframe()
     return df
+
+st.set_page_config(
+    page_title="Next RBA Meeting Decision",    
+    page_icon="🏦",
+    layout="wide"
+)
 
 data = {}
 for table in BQ_TABLES:
@@ -86,25 +94,42 @@ st.divider()
 st.subheader('Feature Importance')
 
 df_importance = data['ml_feature_importance'].sort_values('importance')
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(8,4))
 ax.barh(df_importance['feature'], df_importance['importance'])
 st.pyplot(fig)
 
 
-# app.py  ├── connect to BigQuery
-#   ├── load data (ml_future_prediction, ml_model_scores, ml_feature_importance, mart_rba_decisions)  │
-#   ├── HEADER — "RBA Rate Decision Tracker"
-#   │
-#   ├── Section 1 — Next Meeting Prediction
-#   │   ├── Next meeting date (June 16 2026)
-#   │   ├── Model prediction (raise/hold/cut) — big bold text
-#   │   └── ASX market implied probability — manual input or scraped
-#   │
-#   ├── Section 2 — Current Economic Conditions
-#   │   └── Last row of mart_rba_decisions — 6 metrics shown as cards/tiles
-#   │
-#   ├── Section 3 — Model Performance
-#   │   └── Table of accuracy/F1 per model from ml_model_scores
-#   │
-#   └── Section 4 — Feature Importances
-#       └── Bar chart from ml_feature_importance
+df_plot = data['mart_rba_decisions'][data['mart_rba_decisions']['date'] >= pd.Timestamp('2020-01-01')]
+
+st.divider()
+st.subheader('Economic Indicators')
+
+col1, col2 = st.columns(2)
+
+with col1:
+    fig, ax = plt.subplots(figsize=(6,3))
+    ax.plot(df_plot['date'], df_plot['trimmed_mean_yoy'])
+    ax.set_title('CPI Trimmed Mean (Year ended %)')
+    ax.axhline(y=2, color='r', linestyle='--')
+    ax.axhline(y=3, color='r', linestyle='--')
+    st.pyplot(fig)
+
+    fig, ax = plt.subplots(figsize=(6,3))
+    ax.plot(df_plot['date'], df_plot['unemployment_rate'])
+    ax.set_title('Unemployment Rate (%)')
+    ax.axhline(y=4, color='r', linestyle='--')
+    ax.axhline(y=4.5, color='r', linestyle='--')
+    st.pyplot(fig)
+
+with col2:
+    fig, ax = plt.subplots(figsize=(6,3))
+    ax.plot(df_plot['date'], df_plot['GDP_growth'])
+    ax.set_title('GDP (Year ended %)')
+    ax.axhline(y=2.5, color='r', linestyle='--')
+    st.pyplot(fig)
+
+    fig, ax = plt.subplots(figsize=(6,3))
+    ax.plot(df_plot['date'], df_plot['cash_rate'])
+    ax.set_title('Cash Rate (%)')
+    st.pyplot(fig)
+
