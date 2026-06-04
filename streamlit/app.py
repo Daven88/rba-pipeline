@@ -29,6 +29,8 @@ for table in BQ_TABLES:
     data[table] = load_data(table)
 
 st.title('Next RBA Meeting Decision')
+
+st.caption("Data last updated: May 2026 — pipeline runs on demand. Prediction is for the June 16 2026 RBA meeting.")
 st.subheader('Next Meeting Prediction')
 
 col1, col2, col3 = st.columns(3)
