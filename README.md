@@ -92,8 +92,16 @@ cp config/.env.example config/.env
 
 ### Authenticate with GCP
 
+Store your service account key at `config/service-account-key.json` (already gitignored), then set the environment variable:
+
+**Linux/macOS:**
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+export GOOGLE_APPLICATION_CREDENTIALS=config/service-account-key.json
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS = "config/service-account-key.json"
 ```
 
 ### Run extraction
