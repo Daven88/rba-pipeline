@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 import os
 import threading
 
-load_dotenv('../../config/.env')
-PROJECT_ID = os.getenv('GCP_PROJECT_ID')
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', '.env'))
+PROJECT_ID = os.getenv('GCP_PROJECT_ID', 'rba-pipeline-494410')
 TABLE_NAME = 'gold.rba_decisions'
 lock = threading.Lock()
 

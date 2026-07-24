@@ -12,3 +12,4 @@ src/project_extension/rba_tables/rba_merged.parquet
 src/project_extension/ml/models/
 config/*.json
 .streamlit/secrets.toml
+venv/

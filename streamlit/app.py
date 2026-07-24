@@ -30,13 +30,17 @@ for table in BQ_TABLES:
 
 st.title('Next RBA Meeting Decision')
 
-st.caption("Data last updated: May 2026 — pipeline runs on demand. Prediction is for the June 16 2026 RBA meeting.")
+last_decision_date = data['mart_rba_decisions']['date'].max()
+next_meeting_date = last_decision_date + pd.Timedelta(weeks=6)
+
+st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — pipeline runs on demand. "
+           f"Next meeting date is estimated (~6 weeks after the last decision), not the RBA's published date.")
 st.subheader('Next Meeting Prediction')
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric('Next Meeting Date', 'June 16 2026')
+    st.metric('Next Meeting Date (est.)', f'{next_meeting_date:%B %d %Y}')
 
 with col2:
     st.metric('Model Prediction (Raise/Hold/Cut)', data['ml_future_prediction']['predicted_direction'].iloc[0].capitalize())

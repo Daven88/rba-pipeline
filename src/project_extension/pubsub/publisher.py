@@ -6,8 +6,8 @@ from io import StringIO
 from dotenv import load_dotenv
 import os
 
-load_dotenv('../../config/.env')
-PROJECT_ID = os.getenv('GCP_PROJECT_ID')
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', '.env'))
+PROJECT_ID = os.getenv('GCP_PROJECT_ID', 'rba-pipeline-494410')
 TABLE_NAME = 'gold.rba_decisions'
 url = 'https://www.rba.gov.au/statistics/cash-rate/'
 
@@ -23,10 +23,9 @@ def scrape_rba_decisions(url):
 def get_latest_date():
     try:
         client = bigquery.Client(project=PROJECT_ID)
-        bq_query = client.query('SELECT MAX(date) FROM `rba-pipeline-494410.gold.rba_decisions`')
-        result = bq_query.result()
-        for row in result:
-            return row[0]
+        bq_query = client.query('SELECT date FROM `rba-pipeline-494410.gold.rba_decisions`')
+        dates = pd.to_datetime([row['date'] for row in bq_query.result()], format='mixed', dayfirst=True)
+        return dates.max() if len(dates) else None
     except Exception:
         return None
     
@@ -67,7 +66,7 @@ if __name__ == '__main__':
         batch_to_load_bq(df)
         print(f"Batch loaded {len(df)} records")
     else:
-        new_rows = df[df['date'] > latest_date]
+        new_rows = df[pd.to_datetime(df['date'], format='mixed', dayfirst=True) > latest_date]
         publish_decisions(new_rows)
         print(f"Published {len(new_rows)} new records")
     
