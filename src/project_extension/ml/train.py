@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from imblearn.over_sampling import SMOTE
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from google.cloud import bigquery
@@ -59,26 +59,31 @@ def train_model(df):
     le = LabelEncoder()
     y = le.fit_transform(y)
 
-    # split the data into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # split the data chronologically: earliest 80% of meetings train, most recent 20% test
+    cutoff = int(len(X) * 0.8)
+    X_train, X_test = X.iloc[:cutoff], X.iloc[cutoff:]
+    y_train, y_test = y[:cutoff], y[cutoff:]
 
     # initialize smote and apply to training set
-    smote = SMOTE()
+    smote = SMOTE(random_state=42)
     X_train, y_train = smote.fit_resample(X_train, y_train)
     
     #bring in the models
-    models  = [LogisticRegression(), RandomForestClassifier(), XGBClassifier()]
+    models  = [LogisticRegression(), RandomForestClassifier(random_state=42), XGBClassifier(random_state=42), SVC(random_state=42)]
     results = {}
 
     for model in models:
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
         score = accuracy_score(y_test, y_pred)
+        macro_f1 = f1_score(y_test, y_pred, average='macro', zero_division=0)
         results[model] = (score, y_pred)
-        print(f'{model.__class__.__name__}: {score:.2f}')
+        print(f'{model.__class__.__name__}: accuracy={score:.2f}, macro_f1={macro_f1:.2f}')
         print(classification_report(y_test, y_pred))
-    
-    best_model = max(results, key=lambda x: results[x][0])
+
+    # select best model by macro F1 rather than accuracy, since accuracy rewards
+    # always predicting the majority class ("hold") on this imbalanced target
+    best_model = max(results, key=lambda m: f1_score(y_test, results[m][1], average='macro', zero_division=0))
     return best_model, X_test, y_test, le, results
 
 def save_to_bigquery(df, table_name):

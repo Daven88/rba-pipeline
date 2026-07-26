@@ -123,36 +123,63 @@ python src/extract/rba_extract.py
 
 ## ML Results & Limitations
 
-Three classification models were trained to predict the direction of Australia's cash rate (raise/hold/cut) using RBA meeting data with macroeconomic
+Four classification models were trained to predict the direction of Australia's cash rate (raise/hold/cut) using RBA meeting data with macroeconomic
 indicators including trimmed mean CPI, unemployment, GDP growth, commodity prices, government spending and productivity.
 
-**Model performance (80/20 train/test split, SMOTE for class imbalance):**
+**Model performance (chronological 80/20 train/test split, SMOTE for class imbalance):**
 
-| Model | Accuracy | Notes |
-|---|---|---|
-| RandomForestClassifier | 0.75 | Strong performer on extended dataset |
-| XGBClassifier | 0.75 | Matches Random Forest performance |
-| LogisticRegression | 0.40 | Underperforms on higher-frequency data |
+Training and test sets are split by meeting date — the earliest 80% of meetings train the model, the most recent 20% test it — so the model is never
+evaluated on data that occurred before what it was trained on. An earlier version of this pipeline used a random split, which let future meetings leak
+into training and inflated accuracy to ~0.75; the numbers below reflect the corrected, forecast-realistic split.
+
+| Model | Accuracy | Macro F1 | Notes |
+|---|---|---|---|
+| SVC | 0.50 | **0.41** | Best model by macro F1 — most balanced across all three classes |
+| LogisticRegression | 0.42 | 0.40 | Lower accuracy but second-best at catching minority classes |
+| XGBClassifier | 0.53 | 0.37 | |
+| RandomForestClassifier | 0.55 | 0.33 | Highest accuracy but near-zero recall on "cut"/"raise" |
+
+**Model selection uses macro F1, not accuracy** — with "hold" decisions making up ~67% of meetings, a model that always predicts "hold" scores 0.67
+accuracy while never once identifying a rate change. Macro F1 weights all three classes equally, so it penalizes that failure mode instead of rewarding it.
 
 **Feature importance (Random Forest):**
 
 | Feature | Importance | Economic interpretation |
 |---|---|---|
-| Commodity price ratio | 0.20 | Bulk vs overall commodity prices — key export indicator |
-| Trimmed mean CPI | 0.19 | RBA's preferred inflation measure |
-| GDP growth | 0.18 | Broader economic growth context |
-| Unemployment | 0.16 | Labour market tightness drives wage and inflation pressure |
-| Government spending | 0.14 | Fiscal stimulus can be inflationary |
-| Productivity growth | 0.14 | Higher productivity reduces cost-push inflation |
+| Commodity price ratio | 0.22 | Bulk vs overall commodity prices — key export indicator |
+| Trimmed mean CPI | 0.22 | RBA's preferred inflation measure |
+| Productivity growth | 0.16 | Higher productivity reduces cost-push inflation |
+| Government spending | 0.15 | Fiscal stimulus can be inflationary |
+| Unemployment | 0.13 | Labour market tightness drives wage and inflation pressure |
+| GDP growth | 0.12 | Broader economic growth context |
 
 **Known limitations:**
 
-- **Class imbalance** — "hold" decisions dominate the dataset (224 hold vs 40 raise vs 34 cut); SMOTE applied to balance training data
+- **Class imbalance** — "hold" decisions dominate the dataset (224 hold vs 40 raise vs 34 cut); SMOTE applied to balance training data, macro F1 used for model selection to avoid rewarding majority-class bias
+- **Small test set** — 60 held-out meetings, only 4 of which are "raise" events, limits how confidently minority-class performance can be judged
 - **Multicollinearity** — household consumption strongly correlated to GDP; commodity prices negatively correlated to unemployment
 - **Annual publication lag** — some indicators (e.g. productivity) published annually, introducing lag vs RBA's real-time data
 
 
 ## Updates
+
+### ML Evaluation Fixes (Data Leakage & Metric Selection)
+
+A review of `src/project_extension/ml/train.py` found the train/test split was randomly shuffling meetings before splitting — discarding the chronological
+ordering the data was loaded in and letting the model train on meetings that occurred *after* the ones it was tested on. This is a classic time-series
+leakage bug, and it was inflating accuracy to a figure (~0.75) that didn't reflect real forecasting performance.
+
+**What was fixed:**
+- Random `train_test_split` replaced with a chronological cutoff — earliest 80% of meetings train, most recent 20% test
+- `random_state` fixed on RandomForest, XGBoost and SMOTE so results are reproducible run-to-run (previously only the now-removed random split was seeded, so RF/XGB/SMOTE varied between runs)
+- Best-model selection switched from raw accuracy to macro F1, since accuracy rewarded a model for defaulting to the majority "hold" class
+- Added `SVC` (Support Vector Machine) to the model comparison — it's now the top performer by macro F1, better suited to this dataset's small sample size than the other models tested
+
+**Why this matters:**
+- The corrected numbers (0.41–0.50 accuracy, 0.33–0.41 macro F1) are lower than the original 0.75, but they're the real, trustworthy figures — an evaluation methodology that leaks the future into training will always look better than it is
+- Verified against baselines: a naive "always predict hold" classifier scores 0.67 accuracy but 0.27 macro F1, and a stratified-random guesser scores 0.34 macro F1 — the current best model (0.41) genuinely beats both, just modestly, which is a realistic ceiling given ~300 rows and rare rate-change events
+
+**In progress:** investigating whether RBA statement sentiment (from a separate `rba-rag` retrieval pipeline) can be joined in as an additional feature. Initial checks found the sentiment table's date field is the meeting date while `mart_rba_decisions.date` is the announcement date (a consistent one-day offset, not a simple date match), plus at least one row that doesn't correspond to any meeting at all — worth resolving in that pipeline before merging the data in here.
 
 ### Pub/Sub Extension
 The initial pipeline (Modules 1–6) was completed with World Bank annual data as the primary data source. However, as noted in the ML limitations, annual data
@@ -183,6 +210,8 @@ statistical tables.
 - Higher-frequency data (monthly/quarterly vs annual) better reflects the signals the RBA actually responds to
 - ~300 usable rows vs ~50 significantly improves model reliability
 - Live dashboard makes findings accessible to a non-technical audience
+
+![Streamlit Dashboard](docs/streamlit.png)
 
 ## Modules
 
