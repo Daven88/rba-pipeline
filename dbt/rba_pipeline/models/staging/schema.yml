@@ -91,3 +91,21 @@ sources:
             tests:
             - not_null
 
+  - name: rba_minutes
+    database: finance-lakehouse
+    schema: rba_minutes
+    tables:
+      - name: sentiment
+        columns:
+          - name: date
+            tests:
+            - not_null
+          - name: sentiment
+            tests:
+            - not_null
+          - name: confidence
+            tests:
+            - not_null
+          - name: dominant_concern
+            tests:
+            - not_null
