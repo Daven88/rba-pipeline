@@ -3,14 +3,40 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from google.oauth2 import service_account
+import google.auth.transport.requests
+import google.oauth2.id_token
+import requests
 
 PROJECT_ID = 'rba-pipeline-494410'
 
 BQ_TABLES = ['ml_future_prediction', 'ml_model_scores', 'ml_feature_importance', 'mart_rba_decisions']
 
+NARRATIVE_API_URL = "https://rba-narrative-api-2gwbjutlmq-ts.a.run.app"
+
+def get_narrative_token(audience):
+    auth_req = google.auth.transport.requests.Request()
+    return google.oauth2.id_token.fetch_id_token(auth_req, audience)
+
+@st.cache_data(ttl=86400)
+def get_narrative():
+    token = get_narrative_token(NARRATIVE_API_URL)
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(f"{NARRATIVE_API_URL}/narrative", headers=headers)
+    response.raise_for_status()
+    return response.json()['narrative']
+
+def calculate_taylor_rule(current_inflation, current_unemployment):
+    NEUTRAL_REAL_RATE = 1.0   # standard textbook estimate, not derived from this data
+    INFLATION_TARGET = 2.5    # RBA's target midpoint (2-3% band)
+    NAIRU = 4.25              # standard full-employment estimate
+
+    inflation_gap = current_inflation - INFLATION_TARGET
+    unemployment_gap = NAIRU - current_unemployment  # positive = tight labour market
+
+    return NEUTRAL_REAL_RATE + current_inflation + 0.5 * inflation_gap + 0.5 * unemployment_gap
+
 def load_data(table):
-    credentials = service_account.Credentials.from_service_account_info(st.secrets['gcp_service_account'])
-    client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
+    client = bigquery.Client(project=PROJECT_ID)
     if table == 'mart_rba_decisions':
         query = f'SELECT * FROM `{PROJECT_ID}.gold.{table}` ORDER BY date'
     else:
@@ -30,24 +56,71 @@ for table in BQ_TABLES:
 
 st.title('Next RBA Meeting Decision')
 
-last_decision_date = data['mart_rba_decisions']['date'].max()
-next_meeting_date = last_decision_date + pd.Timedelta(weeks=6)
+RBA_MEETING_DATES_2026 = [
+    pd.Timestamp('2026-08-11'),
+    pd.Timestamp('2026-09-29'),
+    pd.Timestamp('2026-11-03'),
+    pd.Timestamp('2026-12-08'),
+]
 
-st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — pipeline runs on demand. "
-           f"Next meeting date is estimated (~6 weeks after the last decision), not the RBA's published date.")
+last_decision_date = pd.Timestamp(data['mart_rba_decisions']['date'].max())
+today = pd.Timestamp.now().normalize()
+upcoming_meetings = [d for d in RBA_MEETING_DATES_2026 if d > today]
+next_meeting_date = upcoming_meetings[0] if upcoming_meetings else None
+
+if next_meeting_date is not None:
+    st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — pipeline runs on demand. "
+               f"Next meeting date is the RBA's published date for 2026.")
+else:
+    st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — pipeline runs on demand. "
+               f"2026 meeting dates have all passed — this list needs updating with next year's calendar.")
 st.subheader('Next Meeting Prediction')
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric('Next Meeting Date (est.)', f'{next_meeting_date:%B %d %Y}')
+    if next_meeting_date is not None:
+        st.metric('Next Meeting Date', f'{next_meeting_date:%B %d %Y}')
+    else:
+        st.metric('Next Meeting Date', 'Calendar needs updating')
 
 with col2:
     st.metric('Model Prediction (Raise/Hold/Cut)', data['ml_future_prediction']['predicted_direction'].iloc[0].capitalize())
 
 with col3:
-    st.metric('RBA future Prediction', 'No Change')
+    current_inflation = data['mart_rba_decisions']['trimmed_mean_yoy'].iloc[-1]
+    current_unemployment = data['mart_rba_decisions']['unemployment_rate'].iloc[-1]
+    current_cash_rate = float(data['mart_rba_decisions']['cash_rate'].iloc[-1])
+
+    taylor_target = calculate_taylor_rule(current_inflation, current_unemployment)
+    gap = taylor_target - current_cash_rate
+
+    if gap > 0.25:
+        signal = "Raise"
+    elif gap < -0.25:
+        signal = "Cut"
+    else:
+        signal = "Hold"
+
+    st.metric('Taylor Rule Signal', signal, delta=f'{gap:+.2f}% vs actual {current_cash_rate:.2f}%')
+    st.caption('Illustrative reference point, not a forecast. Uses standard textbook estimates for the '
+               'neutral *real* interest rate (1%, distinct from the 2-3% inflation target above) and '
+               'NAIRU (4.25%) — not derived from this data.')
+    st.text(
+        f"Calculation: {taylor_target:.2f}% = 1.00% (neutral real rate) + {current_inflation:.2f}% (current inflation) "
+        f"+ 0.5 × ({current_inflation:.2f}% − 2.50%) (inflation gap) "
+        f"+ 0.5 × (4.25% − {current_unemployment:.2f}%) (unemployment gap)"
+    )
 st.divider()
+
+st.subheader('AI-Generated Market Commentary')
+
+with st.spinner('Generating narrative...'):
+    try:
+        narrative = get_narrative()
+        st.write(narrative)
+    except Exception as e:
+        st.error(f"Could not load narrative {e}")
 
 st.subheader('Current economic conditions')
 
