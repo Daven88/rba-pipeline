@@ -25,6 +25,33 @@ def get_narrative():
     response.raise_for_status()
     return response.json()['narrative']
 
+# The dashboard is public but the API behind it is not: every /ask runs as
+# this app's service account, so the bill lands on the project rather than on
+# whoever typed the question. These two limits are the whole cost control.
+ASK_QUESTION_LIMIT = 5
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def ask_minutes(question):
+    """
+    Keyed on the question text, and st.cache_data is shared across everyone
+    hitting this server instance — so a question two visitors both ask costs
+    one Gemini call, not two. Unlike get_narrative there is no fixed daily
+    result to cache, which is exactly why the free-text route needs the
+    per-session cap below as well.
+    """
+    token = get_narrative_token(NARRATIVE_API_URL)
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(
+        f"{NARRATIVE_API_URL}/ask",
+        headers=headers,
+        params={"query": question},
+        timeout=90,
+    )
+    response.raise_for_status()
+    return response.json()["answer"]
+
+
 def calculate_taylor_rule(current_inflation, current_unemployment):
     NEUTRAL_REAL_RATE = 1.0   # standard textbook estimate, not derived from this data
     INFLATION_TARGET = 2.5    # RBA's target midpoint (2-3% band)
@@ -121,6 +148,64 @@ with st.spinner('Generating narrative...'):
         st.write(narrative)
     except Exception as e:
         st.error(f"Could not load narrative {e}")
+
+st.subheader('Ask the minutes')
+st.caption(
+    "The commentary above answers one fixed question. This searches all 1,321 sections "
+    "of RBA board minutes since 2006 and answers from the retrieved text alone — no "
+    "outside knowledge. Try: *What did the Board say about the labour market in 2023?*"
+)
+
+if 'ask_count' not in st.session_state:
+    st.session_state.ask_count = 0
+if 'last_answer' not in st.session_state:
+    st.session_state.last_answer = None
+
+asks_left = ASK_QUESTION_LIMIT - st.session_state.ask_count
+
+with st.form('ask_minutes_form'):
+    question = st.text_input(
+        'Your question',
+        max_chars=500,
+        placeholder='e.g. How did the Board describe the housing market in 2017?',
+    )
+    submitted = st.form_submit_button('Ask', disabled=asks_left <= 0)
+
+# Streamlit runs this file top to bottom on every interaction, so asks_left and
+# the button's disabled state are both fixed before the answer is fetched.
+# Incrementing here and rendering further down would report the count from
+# before the question, and leave the button enabled for one question too many.
+# Stash the answer, bump the count, and rerun so the next pass renders both
+# from the updated state. The rerun stays outside the try: st.rerun signals
+# itself by raising, and an `except Exception` would swallow it.
+if submitted and asks_left > 0:
+    asked = question.strip()
+    if len(asked) < 3:
+        st.warning('Please enter a question of at least three characters.')
+    else:
+        answer = None
+        with st.spinner('Searching the minutes...'):
+            try:
+                answer = ask_minutes(asked)
+            except Exception as e:
+                st.error(f'Could not answer that one: {e}')
+        if answer is not None:
+            st.session_state.last_answer = answer
+            st.session_state.ask_count += 1
+            st.rerun()
+
+if st.session_state.last_answer:
+    st.write(st.session_state.last_answer)
+
+if asks_left > 0:
+    st.caption(f'{asks_left} of {ASK_QUESTION_LIMIT} questions remaining this session.')
+else:
+    st.info(
+        f'Question limit reached for this session ({ASK_QUESTION_LIMIT}). '
+        'Refresh to start a new one.'
+    )
+
+st.divider()
 
 st.subheader('Current economic conditions')
 
