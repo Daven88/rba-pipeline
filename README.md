@@ -114,7 +114,7 @@ python src/extract/rba_extract.py
 
 ![ML Analysis Dashboard](docs/dashboard.png)
 
-**Streamlit Dashboard (live):** [RBA Rate Decision Tracker](https://rba-pipeline-escjopb6x4dkn2epqvgvzz.streamlit.app/)  — Next meeting prediction, current economic conditions, model performance and EDA charts
+**Streamlit Dashboard (live):** [RBA Rate Decision Tracker](https://rba-dashboard-213888644789.australia-southeast1.run.app) — Next meeting prediction, current economic conditions, model performance, an AI-generated market commentary and a natural-language Q&A over RBA board minutes
 
 **Looker Studio Dashboard:** [View report](https://datastudio.google.com/reporting/96bc22f1-2266-41d8-a4d5-4362da1fc059)
 — Model performance comparison, feature importance, predicted vs actual by year
@@ -204,7 +204,7 @@ statistical tables.
 - 8 new dbt staging models and an intermediate model joining all features to RBA decision dates → Gold layer
 - Extended ML model trained on ~300 rows of RBA meeting data with SMOTE for class imbalance — Random Forest and XGBoost both achieving 75% accuracy
 - Google Cloud Pub/Sub streaming module for real-time rate decision updates → BigQuery
-- Streamlit dashboard deployed to Streamlit Community Cloud — showing next meeting prediction, current economic conditions, model performance and EDA charts
+- Streamlit dashboard containerised and deployed to Cloud Run with keyless service-account auth — showing next meeting prediction, current economic conditions, model performance and EDA charts
 
 **Why this matters:**
 - Higher-frequency data (monthly/quarterly vs annual) better reflects the signals the RBA actually responds to

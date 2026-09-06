@@ -1,0 +1,6 @@
+# Controls what `gcloud run deploy --source .` uploads to Cloud Build.
+# .dockerignore is applied by Docker *inside* the build, which is too late to
+# stop a 453MB local venv being tarred up and shipped first.
+venv/
+__pycache__/
+*.pyc
