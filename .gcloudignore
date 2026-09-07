@@ -1,0 +1,17 @@
+# Controls what `gcloud run jobs deploy --source .` uploads to Cloud Build.
+#
+# Once this file exists, gcloud stops deriving its rules from .gitignore, so
+# the venv/log/__pycache__ exclusions have to be pulled back in explicitly.
+# Without the include below the upload jumps from ~50 files to ~56,000.
+#!include:.gitignore
+
+# .git/ was excluded by the auto-generated file; .gitignore never mentions it.
+.git/
+
+# Nested .gitignore files are not read by gcloud, so dbt's own target/ rule
+# does not apply here. Shipping a Windows-generated manifest.json or
+# partial_parse.msgpack into a Linux image reproduces the backslash KeyError.
+dbt/**/target/
+
+# Diagrams and screenshots the pipeline never reads.
+docs/

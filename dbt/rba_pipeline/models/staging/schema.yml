@@ -32,7 +32,7 @@ sources:
           - name: date
             tests: 
             - not_null
-          - name: unemployed_%
+          - name: unemployed__
             tests: 
             - not_null
           - name: unemployed_trend
@@ -43,10 +43,10 @@ sources:
           - name: date
             tests: 
             - not_null
-          - name: overall_AU$
+          - name: overall_AU_
             tests: 
             - not_null
-          - name: bulk_AU$
+          - name: bulk_AU_
             tests: 
             - not_null
       - name: ext_government_expenditure
@@ -65,7 +65,7 @@ sources:
           - name: date
             tests: 
             - not_null
-          - name: GDP_%
+          - name: GDP__
             tests: 
             - not_null
           - name: ratio_exp_to_imp

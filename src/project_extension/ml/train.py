@@ -8,7 +8,10 @@ from sklearn.svm import SVC
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from google.cloud import bigquery
+from google.cloud import storage
 import joblib
+import io
+import os
 from datetime import datetime
 
 PROJECT_ID = 'rba-pipeline-494410'
@@ -124,10 +127,20 @@ def feature_importance(results, feature_names):
     save_to_bigquery(df, 'gold.ml_feature_importance')
 
 def save_model(best_model):
-    joblib.dump(best_model, f'src/project_extension/ml/models/best_model.pkl')
+    # Cloud Run's filesystem is in-memory and dies with the execution, so the
+    # model has to leave the container to survive the run.
+    buffer = io.BytesIO()
+    joblib.dump(best_model, buffer)
+    buffer.seek(0)
 
-def predict_next(df, le):
-    model = joblib.load(f'src/project_extension/ml/models/best_model.pkl')
+    client = storage.Client()
+    bucket = client.bucket(os.getenv('GCS_SILVER_BUCKET'))
+    blob = bucket.blob('models/best_model.pkl')
+    blob.upload_from_file(buffer)
+
+def predict_next(df, le, model):
+    # The model is still in memory from train_model, so there is nothing to
+    # load back - the round trip through storage never served a purpose here.
     last_row = df.tail(1)[[
                     'trimmed_mean_yoy_lag1', 
                     'unemployment_rate_lag1',
@@ -154,7 +167,7 @@ def main():
     save_predictions(le, best_model, X_test, y_test)
     save_model_scores(results, y_test)
     save_model(best_model)
-    pred = predict_next(df, le)
+    pred = predict_next(df, le, best_model)
     save_prediction_next(pred)
     feature_importance(results, X_test.columns)
 
