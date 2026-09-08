@@ -13,3 +13,5 @@ src/project_extension/ml/models/
 config/*.json
 .streamlit/secrets.toml
 venv/
+# dbt writes an anonymous user id here; not project config
+dbt/rba_pipeline/.user.yml
