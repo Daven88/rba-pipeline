@@ -36,3 +36,12 @@ models:
       +materialized: view
     marts:
       +materialized: table
+
+# Seed types are inferred unless declared. rba_decisions.date landed as STRING
+# and every model referencing it needs a CAST - not worth repeating here.
+seeds:
+  rba_pipeline:
+    rba_meeting_dates:
+      +column_types:
+        meeting_date: date
+        year: int64
