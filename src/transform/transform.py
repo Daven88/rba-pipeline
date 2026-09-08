@@ -34,7 +34,7 @@ def load_to_silver(df, silver_bucket, indicator):
     buffer.seek(0)                                                                                                                                                            
     client = storage.Client()                                                                                                                                                 
     bucket_obj = client.bucket(silver_bucket)
-    blob_name = f'interest_rates/{date.today()}_{indicator}.parquet' 
+    blob_name = f'interest_rates/{indicator}.parquet' 
     blob_loc = bucket_obj.blob(blob_name) 
     blob_loc.upload_from_string(buffer.getvalue(),content_type='application/octet-stream')
     

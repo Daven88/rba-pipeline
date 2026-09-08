@@ -82,7 +82,7 @@ def main():
             bronze_blob = f'rba_tables/{table}/{today}.csv'
             csv_data = read_from_bronze(bronze_bucket, bronze_blob)
             df = clean(csv_data, config)
-            silver_blob = f'rba_tables/{table}/{today}.parquet'
+            silver_blob = f'rba_tables/{table}/{table}.parquet'
             load_to_silver(df, silver_bucket, silver_blob)
         except exceptions.NotFound:
             print(f'{table} not found, does the extract script need to be run today?')

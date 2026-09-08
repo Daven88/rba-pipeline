@@ -82,7 +82,7 @@ Remaining 2026 meetings: **Sep 29, Nov 3, Dec 8**. The list runs dry after that.
 | 8 | Meeting calendar as a dbt seed -> `gold.rba_meeting_dates`, gate in `main.py` | |
 | 9 | Cloud Scheduler daily trigger with OIDC | |
 | 10 | GitHub Actions CI | |
-| 11 | Fix Silver snapshot duplication (see below) | |
+| 11 | Fix Silver snapshot duplication (see below) | done - 2026-09-08 |
 | 12 | Add model-level dbt tests (`unique`, ranges, accepted values) | |
 
 Steps 1-7 get the pipeline running. 8-9 put it on a schedule. 10 is independent
@@ -130,7 +130,30 @@ Also noted: the buckets are in `US` while BigQuery and Cloud Run are in
 Works, but costs latency and egress. Moving a bucket means recreating it and
 repointing the external tables, so it is not a quick fix.
 
-### Silver snapshot duplication (step 11)
+### Silver snapshot duplication (step 11) - FIXED 2026-09-08
+
+Resolved by writing one file per table and overwriting it, rather than a dated
+snapshot per run. Bronze already keeps every dated raw CSV and JSON, so the
+audit trail did not need duplicating in Silver.
+
+    rba_tables/{table}/{today}.parquet      ->  rba_tables/{table}/{table}.parquet
+    interest_rates/{date}_{ind}.parquet     ->  interest_rates/{ind}.parquet
+
+The folder must be kept - the external tables glob a specific directory
+(`gs://.../rba_tables/cpi/*.parquet`), so flattening the path leaves them
+matching nothing. That failure is silent: an empty external table passes
+`not_null` vacuously, `dbt build` stays green, and the marts quietly empty.
+
+Result: 89 Silver files -> 12. `ext_cpi` 1213 rows -> 174, with rows now equal
+to distinct dates on every RBA table. `mart_rba_decisions` stayed at 299 rows,
+confirming the marts had always been deduplicated by the `ROW_NUMBER()` pattern
+and the model's training data is unchanged.
+
+Note `stg_interest_rates_raw` is 396 rows over 66 dates and is correct: its
+grain is (date, indicator_id), 66 years x 6 indicators.
+
+#### Original problem
+
 
 Each run writes a new dated Parquet file holding the **full history**, and the
 external tables read the whole folder with a wildcard:
@@ -175,9 +198,8 @@ transformation.
 
 `accepted_range` needs `dbt_utils` — add a `packages.yml` and run `dbt deps`.
 
-Sequencing note: adding `unique` on `date` before fixing step 11 will fail the
-build immediately, because the duplication is real. Either fix 11 first, or add
-the test with `severity: warn` and promote it to `error` once clean.
+Sequencing note: step 11 is now fixed, so these can go straight in at the
+default `error` severity - the data is genuinely clean.
 
 ### GitHub Actions (step 10)
 
