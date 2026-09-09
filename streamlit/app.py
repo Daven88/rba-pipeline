@@ -9,7 +9,9 @@ import requests
 
 PROJECT_ID = 'rba-pipeline-494410'
 
-BQ_TABLES = ['ml_future_prediction', 'ml_model_scores', 'ml_feature_importance', 'mart_rba_decisions']
+BQ_TABLES = ['ml_future_prediction', 'ml_model_scores', 
+             'ml_feature_importance', 'mart_rba_decisions',
+             'rba_meeting_dates']
 
 NARRATIVE_API_URL = "https://rba-narrative-api-2gwbjutlmq-ts.a.run.app"
 
@@ -83,24 +85,21 @@ for table in BQ_TABLES:
 
 st.title('Next RBA Meeting Decision')
 
-RBA_MEETING_DATES_2026 = [
-    pd.Timestamp('2026-08-11'),
-    pd.Timestamp('2026-09-29'),
-    pd.Timestamp('2026-11-03'),
-    pd.Timestamp('2026-12-08'),
-]
+meeting_dates = pd.to_datetime(data['rba_meeting_dates']['meeting_date'])
 
 last_decision_date = pd.Timestamp(data['mart_rba_decisions']['date'].max())
 today = pd.Timestamp.now().normalize()
-upcoming_meetings = [d for d in RBA_MEETING_DATES_2026 if d > today]
-next_meeting_date = upcoming_meetings[0] if upcoming_meetings else None
+upcoming_meetings = [d for d in meeting_dates if d > today]
+next_meeting_date = min(upcoming_meetings) if upcoming_meetings else None
 
 if next_meeting_date is not None:
-    st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — pipeline runs on demand. "
-               f"Next meeting date is the RBA's published date for 2026.")
+    st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — the pipeline refreshes "
+               f"automatically two days before each RBA meeting. Meeting dates come from the "
+               f"RBA's published calendar.")
 else:
-    st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — pipeline runs on demand. "
-               f"2026 meeting dates have all passed — this list needs updating with next year's calendar.")
+    st.caption(f"Data last updated: {last_decision_date:%B %d %Y} — the pipeline refreshes "
+               f"automatically two days before each RBA meeting. All published meeting dates "
+               f"have passed; next year's calendar needs adding.")
 st.subheader('Next Meeting Prediction')
 
 col1, col2, col3 = st.columns(3)
