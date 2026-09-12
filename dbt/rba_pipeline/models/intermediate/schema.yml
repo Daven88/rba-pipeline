@@ -1,0 +1,6 @@
+version: 2
+
+models:
+  - name: int_rba_features
+    tests:
+    - not_empty

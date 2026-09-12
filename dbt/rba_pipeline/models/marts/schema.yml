@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: mart_rba_decisions
+    tests: 
+      - not_empty
+
+  - name: mart_australia_rates
+    tests: 
+      - not_empty
+
+  - name: mart_rba_decisions_with_sentiment
+    tests:
+      - not_empty

@@ -12,4 +12,6 @@ COPY main.py .
 
 ENV DBT_PROFILES_DIR=/app/dbt/rba_pipeline
 
+RUN cd /app/dbt/rba_pipeline && dbt deps
+
 CMD ["python", "main.py"]
