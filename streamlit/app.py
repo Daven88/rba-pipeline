@@ -238,7 +238,7 @@ with col1:
 
 with col2:
     current = data['mart_rba_decisions']['government_spending'].iloc[-1]
-    previous = data['mart_rba_decisions']['government_spending'].iloc[-1]
+    previous = data['mart_rba_decisions']['government_spending'].iloc[-2]
     st.metric('Government Spending', f"{current:.2f}%", delta=round(current - previous, 2))
     st.caption('Annual govt spending growth (yoy) | High spending can be inflationary')
 
