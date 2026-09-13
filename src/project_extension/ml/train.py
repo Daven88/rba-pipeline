@@ -13,6 +13,7 @@ import joblib
 import io
 import os
 from datetime import datetime
+from dotenv import load_dotenv
 
 PROJECT_ID = 'rba-pipeline-494410'
 
@@ -31,9 +32,7 @@ def categorise_change(x):
         return 'cut'
 
 def prepare_features(df):
-    # remove + using .replace
-    df['rate_change'] = df['rate_change'].str.replace('+', '')
-    # convert from string to float
+    # BigQuery NUMERIC arrives as decimal.Decimal - convert for sklearn
     df['rate_change'] = df['rate_change'].astype(float)
     # create a new column called rate_change cat
     df['rate_change_cat'] = df['rate_change'].apply(categorise_change)
@@ -161,6 +160,8 @@ def save_prediction_next(pred):
     save_to_bigquery(df, 'gold.ml_future_prediction')
 
 def main():
+    dotenv_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'config', '.env')
+    load_dotenv(dotenv_path)
     df = load_data()
     df = prepare_features(df)
     best_model, X_test, y_test, le, results = train_model(df)
