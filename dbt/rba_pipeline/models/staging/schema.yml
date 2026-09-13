@@ -115,36 +115,78 @@ models:
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: trimmed_mean_yoy
+        tests:
+          - dbt_utils.accepted_range:
+              arguments: 
+                min_value: -5
+                max_value: 20
 
   - name: stg_labour_force
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: unemployed__
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 20
 
   - name: stg_commodity_prices
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: overall_AU_
+        tests:
+          - dbt_utils.accepted_range:
+              arguments: 
+                min_value: 0
+                max_value: 1000
 
   - name: stg_government_expenditure
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: government_spending
+        tests:
+          - dbt_utils.accepted_range:
+              arguments: 
+                min_value: -20
+                max_value: 20
 
   - name: stg_gdp
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: GDP__
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -20
+                max_value: 20
 
   - name: stg_productivity
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: year_ended_productivity_growth
+        tests:
+          - dbt_utils.accepted_range:
+              arguments: 
+                min_value: -20
+                max_value: 20
 
   - name: stg_rba_decisions
     columns:
       - name: date
         tests: [not_null, unique]
+      - name: cash_rate
+        tests: 
+          - dbt_utils.accepted_range:
+              arguments: 
+                min_value: 0
+                max_value: 20
 
   # Grain is the pair, not the date: 66 years x 6 indicators. A plain unique
   # test on date would fail on correct data.
@@ -164,6 +206,12 @@ models:
           - accepted_values:
               arguments:
                 values: ['dovish', 'neutral', 'hawkish']
+      - name: confidence
+        tests:
+          - dbt_utils.accepted_range:
+              arguments: 
+                min_value: 1
+                max_value: 5
 
       - name: dominant_concern
         tests: 

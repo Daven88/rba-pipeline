@@ -4,3 +4,7 @@ models:
   - name: int_rba_features
     tests:
     - not_empty
+    columns: 
+      - name: decision_date
+        tests: 
+          - unique

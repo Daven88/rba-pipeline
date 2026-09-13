@@ -4,6 +4,15 @@ models:
   - name: mart_rba_decisions
     tests: 
       - not_empty
+    columns:
+      - name: date
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments: 
+                to: ref('stg_rba_decisions')
+                field: date
 
   - name: mart_australia_rates
     tests: 
