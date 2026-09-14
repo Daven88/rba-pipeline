@@ -1,26 +1,27 @@
 # RBA Interest Rate Pipeline
 
-With inflation surging and petrol prices at record highs, many Australians are asking: will interest rates go up or down? For property investors, this question is critical — higher rates directly reduce borrowing capacity, limiting what you can afford to buy. This pipeline extracts macro-economic indicators from the World Bank API, transforms and models them across a Bronze→Silver→Gold architecture on GCP, and applies machine learning to predict the direction of Australia's interest rates ahead of RBA meetings — helping answer the question: is now a good time to borrow?
+With inflation surging and petrol prices at record highs, many Australians are asking: will interest rates go up or down? For property investors, this question is critical — higher rates directly reduce borrowing capacity, limiting what you can afford to buy. This pipeline extracts macro-economic indicators from the Reserve Bank of Australia's published statistical tables, transforms and models them across a Bronze→Silver→Gold architecture on GCP, and applies machine learning to predict the direction of Australia's interest rates ahead of RBA meetings — helping answer the question: is now a good time to borrow?
 
 ## Architecture
 
 ```
-World Bank API (JSON)
+RBA statistical tables (CSV)
         │
         ▼
-  Bronze Layer (GCS)          ← raw JSON, preserved as-is
+  Bronze Layer (GCS)          ← raw CSV, preserved as-is
         │
         ▼
   Silver Layer (GCS)          ← cleaned & flattened Parquet (Python)
         │
         ▼
-  Gold Layer (BigQuery)       ← modelled tables (dbt)
+  Gold Layer (BigQuery)       ← modelled tables (dbt) + 57 data tests
         │
         ▼
   ML Layer (BigQuery)         ← rate direction predictions (scikit-learn)
         │
         ▼
-  Orchestration (Airflow)     ← scheduled every ~6 weeks (RBA meeting cadence)
+  Cloud Run Job               ← daily trigger, gated on the RBA meeting calendar
+  + Cloud Scheduler              so it runs only on T-2 and T+14 of each meeting
 ```
 ## Economic Indicators
 
@@ -29,7 +30,7 @@ The pipeline models 6 key macroeconomic indicators used by the RBA in rate decis
 ![Economic Indicators](docs/eda.png)
 
 
-![Architecture Diagram](docs/Model_diagram2.drawio.png)
+![Architecture Diagram](docs/Model_diagram2.drawiorevamp.png)
 
 ## Tech Stack
 
@@ -39,31 +40,32 @@ The pipeline models 6 key macroeconomic indicators used by the RBA in rate decis
 | Object storage | Google Cloud Storage    |
 | Warehouse      | BigQuery                |
 | Transformation | dbt Core + Python       |
+| Testing        | 57 dbt data tests       |
 | Streaming      | Google Cloud Pub/Sub    |
-| Orchestration  | Apache Airflow (Docker) |
+| Orchestration  | Cloud Run Jobs + Cloud Scheduler |
 | ML             | scikit-learn            |
-| Language       | Python 3.11+ / SQL      |
-| Dashboard      | Streamlit / Looker      |
+| Language       | Python 3.12 / SQL       |
+| Dashboard      | Streamlit on Cloud Run  |
 
 ## Project Structure
 
 ```
 rba-pipeline/  
+├── main.py                     # Cloud Run Job entrypoint + meeting-calendar gate
+├── Dockerfile                  # Pipeline container image
 ├── src/
-│   ├── extract/                # World Bank API extraction → Bronze (GCS)  
-│   ├── transform/              # Python transforms → Silver (GCS)
-│   ├── ml/                     # Original ML model (World Bank data)
 │   └── project_extension/
 │       ├── extract/            # RBA tables extraction → Bronze (GCS)
 │       ├── transform/          # RBA tables transforms → Silver (GCS)
-│       ├── ml/                 # Extended ML model (RBA meeting data)
+│       ├── ml/                 # ML model (RBA meeting data)
 │       ├── pubsub/             # Pub/Sub streaming module
 │       └── rba_tables/         # EDA notebook
-├── dbt/                        # dbt models → Gold (BigQuery)
-├── airflow/
-│   └── dags/                   # Orchestration DAGs
-├── streamlit/                  # Streamlit dashboard
-├── .streamlit/                 # Streamlit config and theme
+├── dbt/rba_pipeline/
+│   ├── models/                 # staging → intermediate → marts (Gold)
+│   ├── macros/                 # custom generic tests (not_empty)
+│   └── seeds/                  # RBA meeting calendar (2026–2027)
+├── streamlit/                  # Streamlit dashboard (own Docker context)
+├── docs/                       # Architecture diagram, design notes
 ├── config/                     # Environment config templates
 └── tests/                      # Unit and integration tests
 ```
@@ -72,10 +74,10 @@ rba-pipeline/
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12
 - GCP project with billing enabled
 - GCS buckets: `rba-pipeline-bronze`, `rba-pipeline-silver`
-- GCP service account key with Storage Object Admin role
+- BigQuery dataset `gold`
 
 ### Install dependencies
 
@@ -92,22 +94,31 @@ cp config/.env.example config/.env
 
 ### Authenticate with GCP
 
-Store your service account key at `config/service-account-key.json` (already gitignored), then set the environment variable:
-
-**Linux/macOS:**
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS=config/service-account-key.json
-```
-
-**Windows (PowerShell):**
-```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS = "config/service-account-key.json"
-```
-
-### Run extraction
+The pipeline uses Application Default Credentials — there are **no service account keys
+anywhere in this project**. Locally:
 
 ```bash
-python src/extract/rba_extract.py
+gcloud auth application-default login
+```
+
+In production, the Cloud Run Job and the dashboard each run as their own service account
+with no key material involved. The dashboard's account is deliberately read-only
+(`bigquery.dataViewer`, `bigquery.jobUser`) so a bug in the public app can never mutate
+the warehouse.
+
+### Run the pipeline locally
+
+```bash
+python main.py                    # honours the meeting-calendar gate
+FORCE_RUN=true python main.py     # bypasses the gate
+```
+
+### Run dbt
+
+```bash
+cd dbt/rba_pipeline
+dbt deps
+dbt build                         # 11 models, 1 seed, 57 data tests
 ```
 
 ## Dashboard
@@ -119,7 +130,75 @@ python src/extract/rba_extract.py
 **Looker Studio Dashboard:** [View report](https://datastudio.google.com/reporting/96bc22f1-2266-41d8-a4d5-4362da1fc059)
 — Model performance comparison, feature importance, predicted vs actual by year
 
+
+## Architecture Decisions
+
+### Orchestration: Airflow → Cloud Run Jobs
+
+The pipeline was originally orchestrated by a 4-task Airflow DAG running in Docker
+(LocalExecutor, with `src/`, `dbt/` and GCP credentials volume-mounted). It worked, but
+Airflow was the wrong tool for this workload.
+
 ![Airflow DAG](docs/airflow.png)
+
+The RBA meets **eight times a year**. Cloud Composer — managed Airflow on GCP — runs a
+permanently-on GKE cluster at roughly **$300/month**, which works out at about $450 per
+pipeline run. Self-hosting Airflow means running and patching a scheduler that is idle
+99% of the time.
+
+It now runs as a **Cloud Run Job** triggered daily by **Cloud Scheduler**, with the
+meeting calendar as a gate inside the container:
+
+- Cron cannot express "two days before an irregular date", so the job wakes daily,
+  reads `gold.rba_meeting_dates`, and exits 0 unless today is **T-2** or **T+14** of a
+  meeting
+- **T-2** catches every data release the Board will see — the RBA schedules meetings
+  after the ABS releases it wants
+- **T+14** captures the actual decision once minutes are published, so the training set
+  gains the meeting it just predicted
+
+**Trade-off:** no Airflow UI, no task-level retries, no backfill semantics. At four
+sequential tasks with no branching, none of those were being used. Cost went from ~$300
+a month to cents per run.
+
+### No service account keys
+
+Google org policy blocked service-account key creation on the original project, which
+turned out to be a good constraint. Everything runs on Application Default Credentials
+locally and attached service accounts in production. The dashboard even calls a private
+Cloud Run service in a *different* GCP project by minting an ID token at request time —
+no key material anywhere in the system.
+
+### Silver overwrites rather than snapshots
+
+Early runs wrote a dated Parquet per table per run, each holding the full history, with
+external tables globbing the folder. After five runs `ext_cpi` held 865 rows across 173
+distinct dates. The marts were only correct by accident, via a `ROW_NUMBER() ... rn = 1`
+pattern written for an unrelated reason. Silver now overwrites one file per table.
+
+That change made `not_empty` tests essential rather than optional: with no dated
+snapshots to fall back on, a half-failed extract writing an empty Parquet would destroy
+the good data — and every `not_null` and `unique` test would still pass, because they
+pass vacuously on an empty table.
+
+## Data Quality
+
+`dbt build` runs **57 data tests** across every layer — sources, staging, intermediate
+and marts:
+
+| Test | Applied to | Catches |
+|---|---|---|
+| `not_null` | source and staging date/value columns | Missing data at the boundary |
+| `unique` | every staging and mart date column | Duplicate history from re-runs |
+| `not_empty` (custom) | every mart and the intermediate model | A model silently returning zero rows |
+| `accepted_values` | LLM-derived sentiment and dominant concern | Prompt drift producing new labels |
+| `accepted_range` | 8 numeric columns | Column shifts — a positional `usecols` grabbing an index level where a percentage belongs |
+| `relationships` | mart date → staging decisions | Mart rows with no decision behind them |
+| `unique_combination_of_columns` | long-format indicator table | Grain violations where a plain `unique` would be wrong |
+
+Range bounds are set at *economically impossible* rather than *historically
+unprecedented* — unemployment `0–20`, not `3–12`. A test that fires during a genuine
+recession gets disabled, and then it protects nothing.
 
 ## ML Results & Limitations
 
@@ -202,7 +281,7 @@ statistical tables.
 - Extraction of 6 RBA statistical tables (CPI, labour force, commodity prices, GDP, government expenditure, productivity) → Bronze layer
 - Python transforms → Silver layer (Parquet)
 - 8 new dbt staging models and an intermediate model joining all features to RBA decision dates → Gold layer
-- Extended ML model trained on ~300 rows of RBA meeting data with SMOTE for class imbalance — Random Forest and XGBoost both achieving 75% accuracy
+- Extended ML model trained on ~300 rows of RBA meeting data with SMOTE for class imbalance (the 75% accuracy originally reported here was an artefact of train/test leakage — see ML Evaluation Fixes below)
 - Google Cloud Pub/Sub streaming module for real-time rate decision updates → BigQuery
 - Streamlit dashboard containerised and deployed to Cloud Run with keyless service-account auth — showing next meeting prediction, current economic conditions, model performance and EDA charts
 
@@ -218,15 +297,22 @@ statistical tables.
 | Module | Description                        | Status      |
 |--------|------------------------------------|-------------|
 | 1      | Project setup & GCP config         | Complete    |
-| 2      | API extraction → Bronze layer      | Complete    |
+| 2      | Source extraction → Bronze layer   | Complete    |
 | 3      | Python transforms → Silver layer   | Complete    |
 | 4      | dbt + BigQuery → Gold layer        | Complete    |
 | 5      | ML layer (rate direction model)    | Complete    |
-| 6      | Airflow DAG orchestration          | Complete    |
+| 6      | Orchestration (Airflow → Cloud Run Jobs) | Complete |
 | 7      | PySpark module (separate dataset)  | Pending     |
 
 ## Data Source
 
-Interest rate data is sourced from the [World Bank Open Data API](https://data.worldbank.org/indicator/FR.INR.LEND), which publishes Australia's lending interest rate (closely tracking RBA cash rate decisions). No API key is required.
-
 RBA statistical tables are sourced directly from the [Reserve Bank of Australia](https://www.rba.gov.au/statistics/) website, covering CPI, labour force, commodity prices, GDP, government expenditure and productivity. No API key is required.
+
+Cash rate decisions are scraped from the RBA and loaded via Pub/Sub. The meeting
+calendar is maintained as a dbt seed from the RBA's published
+[Board meeting schedule](https://www.rba.gov.au/schedules-events/board-meeting-schedules.html).
+
+An earlier version of this pipeline used the [World Bank Open Data API](https://data.worldbank.org/indicator/FR.INR.LEND)
+as its primary source. It was retired once the RBA tables were in place: World Bank data
+is annual, yielding only ~50 usable rows against ~300 from RBA meeting data, and the
+`FR.INR.LEND` indicator has published nothing since 2019.
