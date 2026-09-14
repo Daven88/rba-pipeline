@@ -1,7 +1,5 @@
 import subprocess
 from pathlib import Path
-from src.extract.extract_from_api import main as extract_main
-from src.transform.transform import main as load_transform_main
 from src.project_extension.ml.train import main as ml_train_main
 from src.project_extension.extract.extract_rba_tables import main as extract_rba_main
 from src.project_extension.transform.transform_rba_tables import main as transform_rba_main
@@ -34,8 +32,6 @@ def main():
     if not os.getenv('FORCE_RUN') and not should_run_today():
         print("Not a scheduled run day, exiting.")
         return
-    extract_main()
-    load_transform_main()
     extract_rba_main()
     transform_rba_main()
     run_dbt()

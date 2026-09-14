@@ -14,10 +14,6 @@ models:
                 to: ref('stg_rba_decisions')
                 field: date
 
-  - name: mart_australia_rates
-    tests: 
-      - not_empty
-
   - name: mart_rba_decisions_with_sentiment
     tests:
       - not_empty
