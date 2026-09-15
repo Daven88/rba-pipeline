@@ -3,6 +3,8 @@ name: Deploy to Cloud Run
 on:
   push:
     branches: [master]
+    # Documentation changes should not rebuild and redeploy the image.
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
     branches: [master]
 

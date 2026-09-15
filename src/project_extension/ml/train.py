@@ -95,14 +95,6 @@ def save_to_bigquery(df, table_name):
     job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
     job.result()
 
-def save_predictions(le, model, X_test, y_test):
-    df_preds = X_test.copy()
-    df_preds = df_preds.reset_index()
-    y_pred = le.inverse_transform(model.predict(X_test))
-    df_preds['predicted_direction'] = y_pred
-    df_preds['actual_direction'] = le.inverse_transform(y_test)
-    save_to_bigquery(df_preds, 'gold.ml_predictions')
-
 def save_model_scores(results, y_test):
     model_list = []
     for model, result in results.items():
@@ -165,7 +157,6 @@ def main():
     df = load_data()
     df = prepare_features(df)
     best_model, X_test, y_test, le, results = train_model(df)
-    save_predictions(le, best_model, X_test, y_test)
     save_model_scores(results, y_test)
     save_model(best_model)
     pred = predict_next(df, le, best_model)

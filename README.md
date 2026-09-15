@@ -204,6 +204,29 @@ snapshots to fall back on, a half-failed extract writing an empty Parquet would 
 the good data — and every `not_null` and `unique` test would still pass, because they
 pass vacuously on an empty table.
 
+### Sentiment is modelled but deliberately not a feature
+
+`mart_rba_decisions_with_sentiment` joins LLM-derived tone (hawkish / neutral / dovish),
+a confidence score and a dominant concern from a separate retrieval pipeline over RBA
+board minutes. It is built and tested, but it does **not** feed the model.
+
+The reason is timing. The minutes are published roughly two weeks after the meeting —
+which is why this pipeline has a T+14 run at all. So at prediction time for a given
+meeting, that meeting's sentiment does not yet exist. Joining it to its own decision
+would train the model on a description of the answer, the same class of bug as the
+random train/test split fixed earlier in this project's history: a large apparent
+accuracy gain that means nothing.
+
+The version that would be legitimate is *lagged* sentiment — does the previous
+meeting's tone predict the next move. That was measured against the cost and left
+unbuilt: sentiment only covers 210 of 299 meetings (it starts in 2006, the mart starts
+in 1998), so `dropna()` would cut the training set by 30% while adding roughly six
+one-hot columns. Fewer rows and more dimensions, on a dataset with only 34 cuts and 40
+raises, is the wrong trade in every direction.
+
+The table stays because it is cheap and the join is already correct. If the minutes
+corpus is ever backfilled to 1998, the experiment becomes worth running.
+
 ## Data Quality
 
 `dbt build` runs **57 data tests** across every layer — sources, staging, intermediate
