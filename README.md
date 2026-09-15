@@ -1,5 +1,7 @@
 # RBA Interest Rate Pipeline
 
+[![Deploy to Cloud Run](https://github.com/Daven88/rba-pipeline/actions/workflows/deploy.yml/badge.svg)](https://github.com/Daven88/rba-pipeline/actions/workflows/deploy.yml)
+
 With inflation surging and petrol prices at record highs, many Australians are asking: will interest rates go up or down? For property investors, this question is critical — higher rates directly reduce borrowing capacity, limiting what you can afford to buy. This pipeline extracts macro-economic indicators from the Reserve Bank of Australia's published statistical tables, transforms and models them across a Bronze→Silver→Gold architecture on GCP, and applies machine learning to predict the direction of Australia's interest rates ahead of RBA meetings — helping answer the question: is now a good time to borrow?
 
 ## Architecture
@@ -40,9 +42,10 @@ The pipeline models 6 key macroeconomic indicators used by the RBA in rate decis
 | Object storage | Google Cloud Storage    |
 | Warehouse      | BigQuery                |
 | Transformation | dbt Core + Python       |
-| Testing        | 57 dbt data tests       |
+| Testing        | 57 dbt data tests + 19 pytest |
 | Streaming      | Google Cloud Pub/Sub    |
 | Orchestration  | Cloud Run Jobs + Cloud Scheduler |
+| CI/CD          | GitHub Actions + Workload Identity Federation |
 | ML             | scikit-learn            |
 | Language       | Python 3.12 / SQL       |
 | Dashboard      | Streamlit on Cloud Run  |
@@ -160,6 +163,26 @@ meeting calendar as a gate inside the container:
 **Trade-off:** no Airflow UI, no task-level retries, no backfill semantics. At four
 sequential tasks with no branching, none of those were being used. Cost went from ~$300
 a month to cents per run.
+
+### CI/CD
+
+Every push to `master` runs the pytest suite, and the build is gated on it
+(`needs: test`). Only if the tests pass does the workflow build the image, push it
+to Artifact Registry and deploy the Cloud Run Job.
+
+Authentication uses **Workload Identity Federation** — GitHub mints a short-lived
+OIDC token that GCP exchanges for credentials, scoped by attribute condition to this
+repository alone. No service account key exists to leak.
+
+The last step matters more than it looks: a `jobs deploy` reports success without ever
+starting the container, so it proves almost nothing. The workflow therefore executes
+the job **without** `FORCE_RUN`, which boots the real entrypoint, reads the meeting
+calendar from BigQuery and exits 0 because today is not a run day. A broken image
+fails the build instead of failing silently six weeks later.
+
+`should_run_today()` is split into a pure `run_days_from(meetings)` and a fetcher
+precisely so the T-2/T+14 arithmetic can be asserted in milliseconds rather than
+discovered by a missed meeting.
 
 ### No service account keys
 
