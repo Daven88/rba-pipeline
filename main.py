@@ -13,19 +13,28 @@ DBT_DIR = Path(__file__).parent / "dbt" / "rba_pipeline"
 def run_dbt():
     subprocess.run(["dbt", "build"], cwd=DBT_DIR, check=True)
 
-def should_run_today():
-    client = bigquery.Client()
-    query = "SELECT meeting_date FROM `rba-pipeline-494410.gold.rba_meeting_dates`"
-    today = datetime.now(ZoneInfo('Australia/Sydney')).date()
-    meetings = {row.meeting_date for row in client.query(query)}
+def run_days_from(meetings):
+    """Run two days before each meeting, to catch every data release the Board
+    will see, and fourteen days after, once the minutes publish the decision.
+    Pure function of the calendar - kept separate from the fetch so it can be
+    tested without BigQuery."""
     pre = {m - timedelta(days=2) for m in meetings}
     post = {m + timedelta(days=14) for m in meetings}
-    run_days = pre | post
+    return pre | post
+
+def fetch_meeting_dates():
+    client = bigquery.Client()
+    query = "SELECT meeting_date FROM `rba-pipeline-494410.gold.rba_meeting_dates`"
+    return {row.meeting_date for row in client.query(query)}
+
+def should_run_today():
+    today = datetime.now(ZoneInfo('Australia/Sydney')).date()
+    run_days = run_days_from(fetch_meeting_dates())
 
     future = sorted(d for d in run_days if d > today)
     print(f"Next run day: {future[0]}" if future
           else "WARNING: No future run days - calendar needs updating")
-    
+
     return today in run_days
 
 def main():

@@ -1,0 +1,71 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  PROJECT_ID: rba-pipeline-494410
+  REGION: australia-southeast1
+  JOB: rba-pipeline
+  IMAGE: australia-southeast1-docker.pkg.dev/rba-pipeline-494410/cloud-run-source-deploy/rba-pipeline
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      # python -m, not bare pytest: it puts the repo root on sys.path so
+      # `from main import ...` resolves.
+      - run: python -m pytest -q
+
+  build-and-deploy:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/213888644789/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+          service_account: rba-pipeline-deployer@rba-pipeline-494410.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push image
+        run: |
+          docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Deploy job
+        run: |
+          gcloud run jobs deploy ${{ env.JOB }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }}
+
+      # A job deploy reports success without ever starting the container, so it
+      # proves almost nothing on its own. Executing without FORCE_RUN exercises
+      # the real entrypoint: the image boots, reads the meeting calendar from
+      # BigQuery, and exits 0 because today is not a run day. On an actual run
+      # day this runs the full pipeline, which is what we would want anyway.
+      - name: Smoke test
+        run: |
+          gcloud run jobs execute ${{ env.JOB }} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --wait

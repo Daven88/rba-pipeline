@@ -1,0 +1,2 @@
+-r airflow/requirements-airflow.txt
+pytest>=8,<9

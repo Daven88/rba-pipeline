@@ -1,0 +1,11 @@
+.git
+venv/
+streamlit/venv/
+**/__pycache__/
+**/*.pyc
+dbt/**/target/
+dbt/**/dbt_packages/
+logs/
+docs/
+tests/
+.github/
