@@ -184,6 +184,32 @@ fails the build instead of failing silently six weeks later.
 precisely so the T-2/T+14 arithmetic can be asserted in milliseconds rather than
 discovered by a missed meeting.
 
+### Infrastructure as code
+
+Everything in GCP is described in `terraform/` - the buckets, the `gold` dataset, three
+service accounts and their IAM, the workload identity pool and provider, Artifact
+Registry, the Cloud Run job, the dashboard service and Cloud Scheduler.
+
+It was built by hand with `gcloud` over several months, then **imported** rather than
+recreated: 22 resources adopted into state with zero downtime and nothing destroyed.
+`terraform plan` now reports no changes.
+
+Two details worth calling out:
+
+**Container images are excluded via `ignore_changes`.** Terraform owns the shape of the
+job - memory, timeout, identity, environment. GitHub Actions owns which image runs.
+Without that exclusion every `terraform apply` would roll the job back to a placeholder
+tag and silently undo the last deploy.
+
+**The first plan wanted to delete four things the config had not mentioned** - the
+scheduler's description, `deletion_protection` on the dashboard, `cpu_idle`, and
+`session_affinity`, which Streamlit needs to keep websocket state on one instance.
+Terraform removes whatever you do not describe, so the first plan after an import is
+where you find out what you were about to destroy.
+
+State lives in a versioned GCS bucket that is deliberately not managed by this
+configuration, since Terraform cannot create the bucket that holds its own state.
+
 ### No service account keys
 
 Google org policy blocked service-account key creation on the original project, which
@@ -337,6 +363,30 @@ statistical tables.
 - Live dashboard makes findings accessible to a non-technical audience
 
 ![Streamlit Dashboard](docs/streamlit.png)
+
+## Documentation
+
+The dbt catalogue is published at
+**[daven88.github.io/rba-pipeline/dbt](https://daven88.github.io/rba-pipeline/dbt/)** -
+every model and column description, column types read live from BigQuery, the tests
+attached to each column, compiled SQL, and an interactive lineage graph. Regenerate with
+`dbt docs generate` and copy `target/index.html`, `manifest.json` and `catalog.json` into
+`docs/dbt/`.
+
+### Known limitation: everything lands in one dataset
+
+The lineage graph shows sources in `gold` feeding staging models that feed marts back in
+`gold`, which reads as though the layers run backwards. They do not - the arrows are
+correct. The problem is the labels: raw external tables, staging views, the intermediate
+model, the marts, the ML outputs and the seed all live in a single BigQuery dataset
+called `gold`.
+
+So the medallion layers exist in the folder structure and in `dbt_project.yml`, but not
+in the warehouse. The fix is per-folder `+schema:` config splitting them into `raw`,
+`staging` and `gold`, which also means recreating the external tables in the new dataset
+and adding those datasets to Terraform. Deliberately deferred: it is a naming problem
+rather than a correctness one, every test passes either way, and it is not worth the
+breakage risk immediately before a scheduled unattended run.
 
 ## Modules
 
