@@ -1,2 +1,4 @@
--r airflow/requirements-airflow.txt
+# What CI installs: the production dependency set plus the test runner.
+-r requirements-pipeline.txt
+
 pytest>=8,<9

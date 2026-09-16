@@ -1,17 +1,13 @@
-requests==2.32.3
-google-cloud-storage==2.18.2
-python-dotenv==1.0.1
-pyarrow==24.0.0
-pandas==2.3.3
-dbt-bigquery==1.11.1
-google-cloud-bigquery==3.41.0
-notebook==7.5.6
-scikit-learn==1.8.0
-xgboost==3.2.0
-google-cloud-pubsub==2.38.0
+# Local development: everything the pipeline needs, plus the dashboard,
+# notebooks and the Pub/Sub module. Shared pins live in requirements-pipeline.txt
+# so they cannot drift - an imbalanced-learn mismatch between these two files
+# once produced a venv that could not import sklearn.
+-r requirements-pipeline.txt
+
 beautifulsoup4==4.14.3
-imbalanced-learn==0.14.2
-streamlit==1.58.0
-matplotlib==3.10.8
 google-auth==2.49.2
+google-cloud-pubsub==2.38.0
 lxml==5.3.0
+matplotlib==3.10.8
+notebook==7.5.6
+streamlit==1.58.0

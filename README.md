@@ -68,9 +68,11 @@ rba-pipeline/
 │   ├── macros/                 # custom generic tests (not_empty)
 │   └── seeds/                  # RBA meeting calendar (2026–2027)
 ├── streamlit/                  # Streamlit dashboard (own Docker context)
-├── docs/                       # Architecture diagram, design notes
+├── terraform/                  # GCP infrastructure, imported from live resources
+├── tests/                      # pytest suite, gates deployment in CI
+├── docs/                       # Architecture diagram, design notes, dbt catalogue
 ├── config/                     # Environment config templates
-└── tests/                      # Unit and integration tests
+└── airflow/                    # Retired Module 6 orchestration, kept for reference
 ```
 
 ## Setup
