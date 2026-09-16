@@ -1,0 +1,9 @@
+# Local state and provider plugins. The state itself lives in GCS.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+
+# .terraform.lock.hcl is deliberately NOT ignored - it pins provider versions
+# so a plan run elsewhere resolves the same ones. Same reasoning as dbt package-lock.yml.
