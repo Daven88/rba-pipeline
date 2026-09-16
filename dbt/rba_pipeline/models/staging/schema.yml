@@ -101,21 +101,33 @@ sources:
 
 models:
   - name: stg_cpi
+    description: >
+      Quarterly trimmed mean CPI from RBA table G1, the Board's preferred inflation
+      measure. Year-ended figures rather than index levels, so the series is
+      comparable across decades.
     columns:
       - name: date
+        description: Quarter end date.
         tests: [not_null, unique]
       - name: trimmed_mean_yoy
+        description: Trimmed mean CPI, year-ended percentage change.
         tests:
           - dbt_utils.accepted_range:
-              arguments: 
+              arguments:
                 min_value: -5
                 max_value: 20
 
   - name: stg_labour_force
+    description: Monthly unemployment rate from RBA table H5, seasonally adjusted and trend.
     columns:
       - name: date
+        description: Month end date.
         tests: [not_null, unique]
       - name: unemployed__
+        description: >
+          Unemployment rate, per cent. The name is a pandas artefact of the original
+          CSV header ("Unemployment rate (%)") and is preserved rather than renamed so
+          the external table keeps matching the Parquet written by the transform.
         tests:
           - dbt_utils.accepted_range:
               arguments:
@@ -123,32 +135,44 @@ models:
                 max_value: 20
 
   - name: stg_commodity_prices
+    description: Monthly commodity price index from RBA table I2, in Australian dollars.
     columns:
       - name: date
+        description: Month end date.
         tests: [not_null, unique]
       - name: overall_AU_
+        description: >
+          All-items commodity price index in AUD. An index level, not a percentage -
+          which is why its accepted_range is 0-1000 while the growth-rate columns
+          elsewhere use -20 to 20.
         tests:
           - dbt_utils.accepted_range:
-              arguments: 
+              arguments:
                 min_value: 0
                 max_value: 1000
 
   - name: stg_government_expenditure
+    description: Quarterly household consumption and government spending growth from RBA table H2.
     columns:
       - name: date
+        description: Quarter end date.
         tests: [not_null, unique]
       - name: government_spending
+        description: Government final consumption expenditure, year-ended percentage change.
         tests:
           - dbt_utils.accepted_range:
-              arguments: 
+              arguments:
                 min_value: -20
                 max_value: 20
 
   - name: stg_gdp
+    description: Quarterly GDP growth and terms of trade from RBA table H1.
     columns:
       - name: date
+        description: Quarter end date.
         tests: [not_null, unique]
       - name: GDP__
+        description: GDP, year-ended percentage change. Name is a pandas artefact of the CSV header.
         tests:
           - dbt_utils.accepted_range:
               arguments:
@@ -156,47 +180,66 @@ models:
                 max_value: 20
 
   - name: stg_productivity
+    description: Quarterly wage and productivity growth from RBA table H4.
     columns:
       - name: date
+        description: Quarter end date.
         tests: [not_null, unique]
       - name: year_ended_productivity_growth
+        description: Labour productivity, year-ended percentage change.
         tests:
           - dbt_utils.accepted_range:
-              arguments: 
+              arguments:
                 min_value: -20
                 max_value: 20
 
   - name: stg_rba_decisions
+    description: >
+      One row per RBA rate decision, scraped from the RBA and loaded via Pub/Sub.
+      Both rate columns are SAFE_CAST to NUMERIC here: the source stores them as
+      STRING, and seven pre-1998 rows hold ranges such as "17.00 to 17.50" from the
+      era before the Board announced a point target. Those become NULL rather than
+      failing the build, and they never reach the marts anyway.
     columns:
       - name: date
+        description: Announcement date, the day after the meeting.
         tests: [not_null, unique]
       - name: cash_rate
-        tests: 
+        description: Cash rate target after the decision, per cent.
+        tests:
           - dbt_utils.accepted_range:
-              arguments: 
+              arguments:
                 min_value: 0
                 max_value: 20
 
   - name: stg_sentiment
+    description: >
+      LLM-derived tone of each set of RBA board minutes, read from a separate GCP
+      project via the rba_minutes source. Deliberately NOT a model feature: the
+      minutes publish roughly two weeks after the meeting, so joining this to its own
+      decision would leak the answer. See the README for the full reasoning.
     columns:
       - name: decision_date
+        description: Meeting date shifted forward one day to match the announcement date used everywhere else.
         tests: [not_null, unique]
 
       - name: sentiment
-        tests: 
+        description: Overall tone of the minutes.
+        tests:
           - accepted_values:
               arguments:
                 values: ['dovish', 'neutral', 'hawkish']
       - name: confidence
+        description: Model confidence in the tone classification, 1 to 5.
         tests:
           - dbt_utils.accepted_range:
-              arguments: 
+              arguments:
                 min_value: 1
                 max_value: 5
 
       - name: dominant_concern
-        tests: 
+        description: The economic concern the minutes dwell on most.
+        tests:
           - accepted_values:
               arguments:
                 values: ['balanced', 'growth', 'inflation']
-

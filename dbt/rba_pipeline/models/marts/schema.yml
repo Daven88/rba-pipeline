@@ -2,18 +2,45 @@ version: 2
 
 models:
   - name: mart_rba_decisions
-    tests: 
+    description: >
+      One row per RBA decision with the macroeconomic conditions that preceded it.
+      This is the table the model trains on and the dashboard reads.
+
+      Every feature appears three times: as at the decision, lagged one meeting, and
+      lagged four meetings (roughly six months). Only the lagged columns are used for
+      training - the current-meeting values describe conditions the Board was reacting
+      to, which are not all published by the time a prediction has to be made.
+    tests:
       - not_empty
     columns:
       - name: date
+        description: RBA announcement date. One row per decision.
         tests:
           - not_null
           - unique
           - relationships:
-              arguments: 
+              arguments:
                 to: ref('stg_rba_decisions')
                 field: date
+      - name: cash_rate
+        description: Cash rate target after this decision, per cent.
+      - name: rate_change
+        description: >
+          Change in the cash rate at this meeting, in percentage points. Mapped to
+          raise / hold / cut in train.py, where it becomes the model's target variable.
+      - name: trimmed_mean_yoy_lag1
+        description: Trimmed mean CPI at the previous meeting - the strongest single feature.
+      - name: unemployment_rate_lag1
+        description: Unemployment rate at the previous meeting.
+      - name: ratio_commodity_lag1
+        description: Bulk over overall commodity prices at the previous meeting, a terms-of-trade proxy.
 
   - name: mart_rba_decisions_with_sentiment
+    description: >
+      mart_rba_decisions with the tone of each set of board minutes left-joined on.
+      Built and tested but not consumed by anything: the minutes publish about two
+      weeks after the meeting, so this sentiment is not available at prediction time.
+      Kept because the join is correct and cheap, and it becomes usable if the minutes
+      corpus is ever backfilled. See the README for the full reasoning.
     tests:
       - not_empty

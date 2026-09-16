@@ -2,9 +2,26 @@ version: 2
 
 models:
   - name: int_rba_features
+    description: >
+      Joins all six macroeconomic series onto each RBA decision date, taking the most
+      recent observation available at that point in time. BigQuery has no ASOF JOIN, so
+      this is six CTEs using ROW_NUMBER() OVER (PARTITION BY decision_date ORDER BY
+      feature_date DESC) filtered to rn = 1.
+
+      The feature tables publish at different cadences - CPI and GDP quarterly, labour
+      force and commodities monthly - so this is what turns a ragged set of series into
+      one row per meeting.
+
+      The join is INNER across all six, which is why the marts start in 1998 rather than
+      1990: before then at least one series is missing. It also means a single failed
+      feature load produces zero rows here and silently empties both marts downstream,
+      which is exactly what the not_empty test exists to catch.
     tests:
-    - not_empty
-    columns: 
+      - not_empty
+    columns:
       - name: decision_date
-        tests: 
+        description: >
+          RBA announcement date. The ROW_NUMBER filters are what enforce one row per
+          decision, so this uniqueness test is really a test of that logic.
+        tests:
           - unique
